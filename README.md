@@ -92,6 +92,7 @@ O sistema detecta a cor baseada no ângulo do **Hue (0-360°)**. Abaixo está a 
 * **Emanuel Ferreira Viana** - *Documentação*
 * **Luiz Isaac Pereira Sampaio** - *Integração com Embarcados*
 * **Victor Almeida Marinho Rego** - *Integração com Embarcados*
+* **Zion Gabriel Santos de Lima** - *Integração com Embarcados*
 * **IFCE** - *Instituto Federal do Ceará*
 
 ---
