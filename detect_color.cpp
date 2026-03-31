@@ -3,7 +3,7 @@
 String detectaCor(float H, float S, float V) {
   int sat_value = (S >= 0.20 || V >= 0.25);
 
-  if (V < 0.15)               return "Preto";
+  if (V < 0.25)    return "Preto";
   if (V > 0.85 && S < 0.15)   return "Branco";
 
   if (sat_value) {
@@ -25,11 +25,13 @@ int isTargetColor(float h, float s, float v, Color target){
     {
         // Intervalo para identificacao de vermelho aumentado (algoritimo simplista)
         case RED:
-            return ((h < 30 || h > 330) && s > 50 && v > 30);
+            return ((h < 30 || h > 330) && s > 0.20 && v > 0.25);
         case BLUE:
-            return (h > 180 && h < 260 && s > 50 && v > 30);
+            return ((h > 180 && h < 260) && s > 0.20 && v > 0.25);
         case GREEN:
-            return (h > 90 && h < 170 && s > 40 && v > 30);
+            return ((h > 90 && h < 170) && s > 0.20 && v > 0.25);
+        case BLACK:
+            return (v < 0.25);
     }
 
     return 0;

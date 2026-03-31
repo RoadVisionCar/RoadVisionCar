@@ -1,14 +1,14 @@
 #include "detect_color.h"
 
-
-// ===== CALCULA O CENTRO DA LINHA =====
+// CALCULA O CENTRO DA LINHA
 void centro_de_linha (int primeiro_preto, int ultimo_preto, int largura){
+  
   if (primeiro_preto != -1) {
     int centro_linha          = (primeiro_preto + ultimo_preto) / 2;
     int centro_imagem         = largura / 2;  // = 80 para 160px de largura
     int desvio_centro_linha   = centro_linha - centro_imagem;
 
-    // ===== DECIDE DIREÇÃO =====
+    // DECIDE DIREÇÃO 
     // desvio_centro_linha negativo = linha à esquerda
     // desvio_centro_linha zero     = linha no centro
     // desvio_centro_linha positivo = linha à direita

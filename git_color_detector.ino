@@ -13,12 +13,11 @@
 #include "detect_color.h"
 #include "linha.h"
 
-// ── Escolha a cor alvo aqui ──────────────────────────────────
+// Escolher a cor do alvo
 // Opções: RED, GREEN, BLUE
-#define COR_ALVO RED
-// ────────────────────────────────────────────────────────────
+#define COR_ALVO BLACK
 
-// ── Pinos AI-THINKER ────────────────────────────────────────
+// Pinos AI-THINKER 
 #define PWDN_GPIO_NUM     32
 #define RESET_GPIO_NUM    -1
 #define XCLK_GPIO_NUM      0
@@ -35,13 +34,12 @@
 #define VSYNC_GPIO_NUM    25
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
-// ────────────────────────────────────────────────────────────
 
 void setup() {
     Serial.begin(115200);
     Serial.println("\n=== Color Tracker ESP32-CAM ===");
 
-    // ── Configuração da câmera ───────────────────────────────
+    // Configuração da câmera 
     camera_config_t config;
     config.ledc_channel = LEDC_CHANNEL_0;
     config.ledc_timer   = LEDC_TIMER_0;
@@ -66,7 +64,7 @@ void setup() {
 
     // Resolução menor = mais rápido e menos RAM usada
     // Opções: FRAMESIZE_QQVGA (160x120), FRAMESIZE_QVGA (320x240)
-    config.frame_size   = FRAMESIZE_QVGA;
+    config.frame_size   = FRAMESIZE_QQVGA;
     config.jpeg_quality = 12;   // 0–63 (menor = melhor qualidade)
     config.fb_count     = 1; // apenas 1 buffer para receber a imagem por vez
 
@@ -80,7 +78,8 @@ void setup() {
     Serial.println("Câmera iniciada com sucesso!");
     Serial.println("Iniciando detecção...\n");
 }
-// ================== RGB → HSV ==================
+
+// RGB → HSV 
 void rgb2hsv(uint8_t r, uint8_t g, uint8_t b,
              float &h, float &s, float &v) {
 
@@ -115,7 +114,7 @@ void rgb2hsv(uint8_t r, uint8_t g, uint8_t b,
 void loop() {
     float H = 0, S = 0, V = 0;
 
-    // ── 1. Captura o frame ───────────────────────────────────
+    // 1. Captura o frame 
     camera_fb_t *fb = esp_camera_fb_get();   // SDK 2.x
     if (!fb) {
         Serial.println("Falha ao capturar frame.");
@@ -126,7 +125,7 @@ void loop() {
     int largura = fb->width;
     int altura  = fb->height;
 
-    // ── 2. Converte JPEG → RGB888 ────────────────────────────
+    // 2. Converte JPEG → RGB888 
     // fmt2rgb888 no SDK 2.x recebe uint8_t* (não ponteiro duplo)
     // então alocamos o buffer manualmente antes de chamar
     size_t   rgb_len = largura * altura * 3;
@@ -149,7 +148,7 @@ void loop() {
         return;
     }
 
-    // ── 3. Percorre os pixels (mesma lógica do código original) ─
+    // 3. Percorre os pixels (mesma lógica do código original)
     long somaX    = 0;
     long somaY    = 0;
     int  contador = 0;
@@ -178,17 +177,23 @@ void loop() {
 
       cont++;
 
-            if (isTargetColor(H, S, V, COR_ALVO)) {
+            if ((x%5==0)&&(isTargetColor(H, S, V, COR_ALVO))) {
                 somaX += x;
                 somaY += y;
                 contador++;
+                Serial.print("1 ");
             }
-        }
+            else if(x%5==0)
+            {
+              Serial.print("- ");
+            }
+      }
+      Serial.print("\n");
     }
 
     free(rgb_buf);  // libera o buffer RGB
 
-    // ── 4. Calcula e exibe o resultado ───────────────────────
+    // 4. Calcula e exibe o resultado 
     int centro_img_x = largura / 2;
     int centro_img_y = altura  / 2;
 
@@ -205,19 +210,21 @@ void loop() {
 
         const char *pos_x = (cx > centro_img_x) ? "direita"   : "esquerda";
         const char *pos_y = (cy > centro_img_y) ? "debaixo"   : "acima";
-
-        Serial.printf("DETECTADO — Centro da cor '%s': (%.1f, %.1f)\n", detectaCor(H, S, V),cx, cy);
+        
+        Serial.printf("DETECTADO — Centro da cor: (%.1f, %.1f)\n", cx, cy);
         Serial.printf("  Dist X: %+.1f px (%s)\n", distx, pos_x);
         Serial.printf("  Dist Y: %+.1f px (%s)\n", disty, pos_y);
         Serial.printf("  Pixels detectados: %d\n\n", contador);
-
+        
     } else {
         Serial.print("Cor alvo nao encontrada no frame.\n");
+        /*
         Serial.printf("'%s' (HSV = %.1f, %.1f, %.1f)\n", detectaCor(H, S, V), H, S, V);
+        */
     }
-    // ===== CALCULA O CENTRO DA LINHA =====
+    // CALCULA O CENTRO DA LINHA
     centro_de_linha (primeiro_preto, ultimo_preto, largura);
 
-  delay(500);
+  delay(4000);
     //delay(300);  // ~3 frames por segundo
 }

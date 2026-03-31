@@ -1,13 +1,14 @@
 #ifndef DETECT_COLOR_H
 #define DETECT_COLOR_H
 
-#include <Arduino.h>   // necessário no ambiente Arduino
+#include <Arduino.h>  
 
 // Enum para representar as cores suportadas
 typedef enum {
     RED,
     GREEN,
-    BLUE
+    BLUE,
+    BLACK
 } Color;
 
 // Detecta os valores HSV do pixel
