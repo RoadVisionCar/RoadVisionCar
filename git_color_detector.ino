@@ -74,20 +74,10 @@ void rgb2hsv(uint8_t r, uint8_t g, uint8_t b, float &h, float &s, float &v)
     }
 }
 
-void CapturaFrame (void)
+void CapturaFrame(void)
 {
-    /*
-    typedef struct {
-        uint8_t * buf;              /*!< Pointer to the pixel data 
-      size_t len;                 /*!< Length of the buffer in bytes 
-      size_t width;               /*!< Width of the buffer in pixels 
-      size_t height;              /*!< Height of the buffer in pixels 
-      pixformat_t format;         !< Format of the pixel data 
-      struct timeval timestamp;   !< Timestamp since boot of the first DMA buffer of the frame 
-      } camera_fb_t;
-    */
-
     fb = esp_camera_fb_get();   // SDK 2.x
+    
     if (!fb)
     {
         Serial.println("Falha ao capturar frame.");
@@ -99,7 +89,7 @@ void CapturaFrame (void)
     altura  = fb->height;
 }
 
-void ConverteJPEG2RGB888(void)
+/*void ConverteJPEG2RGB888(void)
 {
     // fmt2rgb888 no SDK 2.x recebe uint8_t* (não ponteiro duplo)
     // então alocamos o buffer manualmente antes de chamar
@@ -124,29 +114,26 @@ void ConverteJPEG2RGB888(void)
         return;
     }
 }
+*/
 
 void PercorrePixels(void)
 {
-    somaX    = 0;
-    somaY    = 0;
-    contador = 0;
-
-    // primeiro pixel preto a ser detectado
-    primeiro_preto = -1;  // -1 = ainda não encontrou nenhum pixel preto
-
-    // ultimo pixel preto a ser detectado
-    ultimo_preto   = -1;
-
     for (int y = 0; y < altura; y++)
     {
         for (int x = 0; x < largura; x++)
         {
             // idx: index (posicao na memoria)
-            int idx = (y * largura + x) * 3;  // RGB888 = 3 bytes por pixel
+            int idx = (y * largura + x) * 2;  // RGB565 = 2 bytes por pixel
 
-            int r = rgb_buf[idx];
-            int g = rgb_buf[idx + 1];
-            int b = rgb_buf[idx + 2];
+            // data: dados de cada pixel da captura de imagem
+            data = fb->buf;
+            // Reconstrói o uint16_t a partir dos 2 bytes
+            uint16_t pixel = ((uint16_t) data[idx] << 8) | data[idx + 1];
+
+            // Extrai e expande cada canal para 8 bits
+            uint8_t r = ((pixel >> 11) & 0x1F) << 3;
+            uint8_t g = ((pixel >>  5) & 0x3F) << 2;
+            uint8_t b = ((pixel      ) & 0x1F) << 3;
 
             rgb2hsv(r, g, b, H, S, V);
 
@@ -233,7 +220,7 @@ void setup()
     config.pin_pwdn     = PWDN_GPIO_NUM;
     config.pin_reset    = RESET_GPIO_NUM;
     config.xclk_freq_hz = 20000000;
-    config.pixel_format = PIXFORMAT_JPEG;           //trocar por rgb565 (melhor identificação de cores)
+    config.pixel_format = PIXFORMAT_RGB565;           //trocar por rgb565 (melhor identificação de cores)
     config.frame_size   = FRAMESIZE_QQVGA;
     config.jpeg_quality = 12;                       // 0–63 (menor = melhor qualidade)
     config.fb_count     = 1;                        // apenas 1 buffer para receber a imagem por vez
@@ -253,21 +240,25 @@ void loop()
 {
     H = 0, S = 0, V = 0;
 
+   // inicia contagem de tempo 
+    unsigned long start = millis();
+
     // 1. Captura o frame CRIAR FUNÇÃO À PARTE
     CapturaFrame();
 
-    // 2. Converte JPEG → RGB888 
-    ConverteJPEG2RGB888();
-
-    // 3. Percorre os pixels (mesma lógica do código original)
+    // 2. Percorre os pixels (mesma lógica do código original)
     PercorrePixels();    
 
-    free(rgb_buf);  // libera o buffer RGB
+    esp_camera_fb_return(fb);  // libera o buffer da captura da imagem
 
-    // 4. Calcula e exibe o resultado
+    // tempo decorrido até agora
+    unsigned long elapsed = millis() - start;
+    Serial.printf("Tempo decorrido: %i ms\n", elapsed);
+
+    // 3. Calcula e exibe o resultado
     CalculaCentroDeCor();
 
-    // 5. CALCULA O CENTRO DA LINHA
+    // 4. CALCULA O CENTRO DA LINHA
     centro_de_linha (primeiro_preto, ultimo_preto, largura);
 
     delay(4000);

@@ -14,7 +14,8 @@ int largura;
 int altura;
 
 //PercorrePixels(), loop();
-uint8_t *rgb_buf;
+//uint8_t *rgb_buf;
+uint8_t *data;
 
 // PercorrePixels(), CalculaCentroDeCor();
 long somaX, somaY;
