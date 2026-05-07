@@ -1,0 +1,5 @@
+1. expor camera a cor de referencia
+2. dar tempo para o recebimento e entendimento da cor
+    2.1 a camera deve processar uma média da cor analisada
+3. atrelar o hsv da cor analisada a uma variavel
+4. agora a camera pode analisar outras cores e comparar elas com a cor de referencia

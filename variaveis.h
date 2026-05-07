@@ -31,4 +31,8 @@ int centro_img_x, centro_img_y;
 float cx, cy, distx, disty;
 const char *pos_x, *pos_y;
 
+// calibrar()
+groupColors_t referenceGroup;
+
+
 #endif

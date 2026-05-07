@@ -4,8 +4,8 @@
 #include "linha.h"
 #include "variaveis.h"
 
-// Escolher a cor do alvo (RED, GREEN, BLUE, BLACK)
-#define COR_ALVO BLACK
+// Escolher a cor a ser calibrada (RED, GREEN, BLUE, BLACK)
+#define COR_ALVO RED
 
 // Definição de pinos AI-THINKER 
 #define PWDN_GPIO_NUM     32
@@ -25,13 +25,67 @@
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
 
-// RGB → HSV 
-void rgb2hsv(uint8_t r, uint8_t g, uint8_t b, float &h, float &s, float &v)
+// -- Calibra o ESP32 CAM para associar as cores identificadas às cores de referência
+void calibrar()
+{
+    hsv_t media_hsv;
+
+    // passo de extração da cor do pixel da imagem capturada
+    int passo = 20, qnt_pixels = ((int) (altura/passo)) * ((int) (largura/passo));
+    float soma_h = 0, soma_s = 0, soma_v = 0;
+    float media_h = 0, media_s = 0, media_v = 0;
+
+    // obtém a imagem 240 x 320 px
+    CapturaFrame();
+ 
+    // varredura dos pixels da imagem em função do passo
+    for (int y = 0; y < altura; y+= passo)
+    {
+        for (int x = 0; x < largura; x+= passo)
+        {
+            rgb_t cor = Extrai_rgb_565(x, y);
+
+            rgb2hsv(cor, H, S, V);
+
+            soma_h += H;
+            soma_s += S;
+            soma_v += V;
+        }
+    }
+
+    media_hsv = {
+
+        // casting reforçando o tipo de dado de hue, saturation e value
+        .h =  (int) soma_h/qnt_pixels,
+        .s =  (float) soma_s/qnt_pixels,
+        .v =  (float) soma_v/qnt_pixels,
+    };
+
+    // calibração de uma cor de groupColors_t mediante à escolha da COR_ALVO
+    switch (COR_ALVO) {
+        case RED:
+            referenceGroup.red = setTargetColor(media_hsv);
+            break;
+        case BLUE:
+            referenceGroup.blue = setTargetColor(media_hsv);
+            break;
+        case GREEN:
+            referenceGroup.green = setTargetColor(media_hsv);
+            break;
+        case BLACK:
+            referenceGroup.black = setTargetColor(media_hsv);
+            break;
+    }
+}
+
+
+// RGB to HSV 
+void rgb2hsv(rgb_t pixel, float &h, float &s, float &v)
 {
 
-    float rf = r / 255.0;
-    float gf = g / 255.0;
-    float bf = b / 255.0;
+    float rf = pixel.r / 255.0;
+    float gf = pixel.g / 255.0;
+    float bf = pixel.b / 255.0;
 
     float maxv = max(rf, max(gf, bf));
     float minv = min(rf, min(gf, bf));
@@ -74,6 +128,7 @@ void rgb2hsv(uint8_t r, uint8_t g, uint8_t b, float &h, float &s, float &v)
     }
 }
 
+
 void CapturaFrame(void)
 {
     fb = esp_camera_fb_get();   // SDK 2.x
@@ -85,69 +140,81 @@ void CapturaFrame(void)
         return;
     }
 
-    largura = fb->width;
-    altura  = fb->height;
+    largura = fb->width; //240px
+    altura  = fb->height; //320px
 }
 
-/*void ConverteJPEG2RGB888(void)
+
+// tipo de dado: RGB; ver em variaveis.h
+rgb_t Extrai_rgb_565(int x, int y)
 {
-    // fmt2rgb888 no SDK 2.x recebe uint8_t* (não ponteiro duplo)
-    // então alocamos o buffer manualmente antes de chamar
+    // idx: index (posicao na memoria)
+    int idx = (y * largura + x) * 2;  // RGB565 = 2 bytes por pixel
 
-    size_t   rgb_len = largura * altura * 3;
-    rgb_buf = (uint8_t *)malloc(rgb_len);
+    // data: dados de cada pixel da captura de imagem
+    data = fb->buf;
 
-    if (rgb_buf == NULL) {
-        Serial.println("Sem memoria para o buffer RGB.");
-        esp_camera_fb_return(fb);
-        delay(500);
-        return;
-    }
+    // Reconstroi o uint16_t a partir dos 2 bytes
+    uint16_t pixel = ((uint16_t) data[idx] << 8) | data[idx + 1];
 
-    bool ok = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb_buf);
-    esp_camera_fb_return(fb);   // libera o frame o quanto antes — SDK 2.x
-
-    if (!ok) {
-        Serial.println("Falha ao converter imagem para RGB.");
-        free(rgb_buf);
-        delay(500);
-        return;
-    }
+    // Extrai e expande cada canal para 8 bits
+    return {
+        .r = (uint8_t)(((pixel >> 11) & 0x1F) << 3),
+        .g = (uint8_t)(((pixel >>  5) & 0x3F) << 2),
+        .b = (uint8_t)(((pixel      ) & 0x1F) << 3)
+    };
 }
-*/
+
 
 void PercorrePixels(void)
 {
+    // cor usada de referência
+    color_t referenceColor;
+    hsv_t detected_hsv;
+
+    // percorre todos os pixels da imagem
     for (int y = 0; y < altura; y++)
     {
         for (int x = 0; x < largura; x++)
         {
-            // idx: index (posicao na memoria)
-            int idx = (y * largura + x) * 2;  // RGB565 = 2 bytes por pixel
+            rgb_t cor = Extrai_rgb_565(x, y);
 
-            // data: dados de cada pixel da captura de imagem
-            data = fb->buf;
-            // Reconstrói o uint16_t a partir dos 2 bytes
-            uint16_t pixel = ((uint16_t) data[idx] << 8) | data[idx + 1];
+            rgb2hsv(cor, H, S, V);
 
-            // Extrai e expande cada canal para 8 bits
-            uint8_t r = ((pixel >> 11) & 0x1F) << 3;
-            uint8_t g = ((pixel >>  5) & 0x3F) << 2;
-            uint8_t b = ((pixel      ) & 0x1F) << 3;
+            detected_hsv = {
+                .h = H,
+                .s = S, 
+                .v = V,
+            };
 
-            rgb2hsv(r, g, b, H, S, V);
+            // rastreia a posição da linha preta
+            rastreia_linha_preta (detectaCor(H, S, V), primeiro_preto, ultimo_preto, x);
 
-      // Rastreia a posição da linha preta
-      rastreia_linha_preta (detectaCor(H, S, V), primeiro_preto, ultimo_preto, x);
+            switch (COR_ALVO) {
+                case RED:
+                    referenceColor = referenceGroup.red;
+                    break;
+                case BLUE:
+                    referenceColor = referenceGroup.blue;
+                    break;
+                case GREEN:
+                    referenceColor = referenceGroup.green;
+                    break;
+                case BLACK:
+                    referenceColor = referenceGroup.black;
+                    break;
+            }
 
-            if ((x%5==0)&&(isTargetColor(H, S, V, COR_ALVO)))
+            // a cada 5 pixels da largura da imagem, verifica se o pixel contém a COR_ALVO
+            if ((x%5 == 0) && isTargetColor(detected_hsv, referenceColor))
             {
                 somaX += x;
                 somaY += y;
                 contador++;
+
                 Serial.print("1 ");
             }
-            else if(x%5==0)
+            else if(x%5 == 0)
             {
               Serial.print("- ");
             }
@@ -155,6 +222,7 @@ void PercorrePixels(void)
       Serial.print("\n");
     }
 }
+
 
 void CalculaCentroDeCor(void)
 {
@@ -183,6 +251,7 @@ void CalculaCentroDeCor(void)
         */
     }
 }
+
 
 void ExibeSerial(void)
 {
@@ -220,7 +289,7 @@ void setup()
     config.pin_pwdn     = PWDN_GPIO_NUM;
     config.pin_reset    = RESET_GPIO_NUM;
     config.xclk_freq_hz = 20000000;
-    config.pixel_format = PIXFORMAT_RGB565;           //trocar por rgb565 (melhor identificação de cores)
+    config.pixel_format = PIXFORMAT_RGB565;          
     config.frame_size   = FRAMESIZE_QQVGA;
     config.jpeg_quality = 12;                       // 0–63 (menor = melhor qualidade)
     config.fb_count     = 1;                        // apenas 1 buffer para receber a imagem por vez
@@ -239,6 +308,8 @@ void setup()
 void loop()
 {
     H = 0, S = 0, V = 0;
+
+    calibrar();
 
    // inicia contagem de tempo 
     unsigned long start = millis();
