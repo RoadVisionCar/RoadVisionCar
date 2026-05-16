@@ -20,6 +20,7 @@
 #define VSYNC_GPIO_NUM    25
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
+#define LED_FLASH_PIN     4   // pino da lanterna da ESP32-CAM AI-Thinker (Se quiser mudar o estado é só mudar de LOW para HIGH ou vice versa no SETUP)
 
 // ── Acumuladores multi-cor ──────────────────────────────────────────
 long somaX_r = 0, somaY_r = 0; int contador_r = 0;   // Vermelho
@@ -86,17 +87,43 @@ void CapturaFrame(void)
 
 // ── Percorre pixels — detecta as 3 cores simultaneamente ─────────────
 void PercorrePixels(void) {
-    for (int y = 0; y < altura; y++) {
-        for (int x = 0; x < largura; x++) {
-            int idx = (y * largura + x) * 2;        // RGB565 = 2 bytes/pixel
+    //delimitadores da faixa:
+    int y_inicial = 0;
+    int y_final = altura;
+    int x_inicial = 0;
+    int x_final = largura;
+    int valorMatrixKernel = 8;
+    // Os finais e iniciais são para delimitar uma faixa caso queira usar
+    // o mais 5 no final é para fazer o filtro de kernel.
+    for (int y = y_inicial; y < y_final; y += valorMatrixKernel) {
+        for (int x = x_inicial; x < x_final; x += valorMatrixKernel) {
+            //Filtro de kernel, tira a media de uma matriz 5x5 e faz disso como "um pixel só"
+            hue = 0;
+            sat = 0;
+            val = 0;
             data = fb->buf;
+            for (int i = 0; i < valorMatrixKernel; i++) {
+                for (int j = 0; j < valorMatrixKernel; j++){
+                    float val_kernel;
+                    float hue_kernel;
+                    float sat_kernel;
+                    int idx = ((j+y)* largura + (x+i)) * 2;        // RGB565 = 2 bytes/pixel
+                    
+                    uint16_t pixel = ((uint16_t)data[idx] << 8) | data[idx + 1];
+                    uint8_t r = ((pixel >> 11) & 0x1F) << 3;
+                    uint8_t g = ((pixel >>  5) & 0x3F) << 2;
+                    uint8_t b = ((pixel) & 0x1F) << 3;
 
-            uint16_t pixel = ((uint16_t)data[idx] << 8) | data[idx + 1];
-            uint8_t r = ((pixel >> 11) & 0x1F) << 3;
-            uint8_t g = ((pixel >>  5) & 0x3F) << 2;
-            uint8_t b = ((pixel) & 0x1F) << 3;
-
-            rgb2hsv(r, g, b, hue, sat, val);
+                    rgb2hsv(r, g, b, hue_kernel, sat_kernel, val_kernel);
+                    hue += hue_kernel;
+                    sat += sat_kernel;
+                    val += val_kernel;
+                }
+            }
+            // Ao quadrado pois é uma matriz.
+            hue /= valorMatrixKernel*valorMatrixKernel;
+            sat /= valorMatrixKernel*valorMatrixKernel;
+            val /= valorMatrixKernel*valorMatrixKernel;
 
             // ── Classificação do pixel ────────────────────────────────
             Color cor = detectaCor(hue, sat, val);
@@ -113,7 +140,7 @@ void PercorrePixels(void) {
             if (isBlack) { somaX_p += x; somaY_p += y; contador_p++; }
 
             // ── Print amostrado (1 em cada 5 colunas) ─────────────────
-            if (x % 5 == 0) {
+            if (x % 1 == 0) {
                 switch(cor)  {
                     case RED:
                         Serial.print("R ");
@@ -191,6 +218,12 @@ void setup()
     config.jpeg_quality = 12;
     config.fb_count = 1;
     config.fb_location = CAMERA_FB_IN_DRAM;
+    
+    //Controle da Lanterna e Led Vermelho
+    pinMode(LED_FLASH_PIN, OUTPUT);
+
+    digitalWrite(LED_FLASH_PIN, HIGH);   // lanterna desligada(LOW) ligada(HIGH)
+
 
     esp_err_t err = esp_camera_init(&config);
     if (err != ESP_OK) {
@@ -203,8 +236,6 @@ void setup()
 // ── Loop ──────────────────────────────────────────────────────────────
 void loop()
 {
-    hue = 0, sat = 0, val = 0;
-
     unsigned long start = millis();
 
     CapturaFrame();
