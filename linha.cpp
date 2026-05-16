@@ -1,12 +1,14 @@
 #include "detect_color.h"
 
+// Em teste
+
 // CALCULA O CENTRO DA LINHA
 void centro_de_linha (int primeiro_preto, int ultimo_preto, int largura){
   
   if (primeiro_preto != -1) {
-    int centro_linha          = (primeiro_preto + ultimo_preto) / 2;
-    int centro_imagem         = largura / 2;  // = 80 para 160px de largura
-    int desvio_centro_linha   = centro_linha - centro_imagem;
+    int centro_linha = (primeiro_preto + ultimo_preto) / 2;
+    int centro_imagem = largura / 2;  // = 80 para 160px de largura
+    int desvio_centro_linha = centro_linha - centro_imagem;
 
     // DECIDE DIREÇÃO 
     // desvio_centro_linha negativo = linha à esquerda
@@ -32,10 +34,10 @@ void centro_de_linha (int primeiro_preto, int ultimo_preto, int largura){
   }
 }
 
-int rastreia_linha_preta (String cor_HSV, int primeiro_preto, int ultimo_preto, int x){
-  if (cor_HSV == "Preto") {
+int rastreia_linha_preta (Color cor_HSV, int &primeiro_preto, int &ultimo_preto, int x){
+  if (cor_HSV == BLACK) {
         if (primeiro_preto == -1) {
-          return primeiro_preto = x;
+        return primeiro_preto = x;
         }
         return ultimo_preto = x;
       }
